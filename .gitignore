@@ -1,0 +1,23 @@
+# Protección auxiliar; revisar siempre los archivos antes de publicar.
+*.pem
+*.key
+*.p12
+*.pfx
+!.gitignore
+!/keys/public.pem
+.env
+.env.*
+*Contrasena*
+*Contraseña*
+*password*
+*token*
+**/Profile/
+**/profiles/
+*.rkupdate
+**/ragnarok-channel.json
+*.zip
+*.rar
+*.7z
+*.apk
+*.exe
+*.pdf
