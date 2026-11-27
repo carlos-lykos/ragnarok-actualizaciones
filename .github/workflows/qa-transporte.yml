@@ -1,0 +1,33 @@
+name: Comprobar transporte del canal (QA)
+on:
+  push:
+    paths:
+      - '.github/workflows/qa-transporte.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Obtener prueba publicada y clave pública
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPO/contents/qa/ragnarok-channel-probe.json?ref=$GITHUB_SHA" --jq .content | base64 -d > ragnarok-channel-probe.json
+          gh api "repos/$REPO/contents/keys/public.pem?ref=$GITHUB_SHA" --jq .content | base64 -d > public.pem
+          node -e 'const f=require("fs"),c=require("crypto"),e=JSON.parse(f.readFileSync("ragnarok-channel-probe.json"));const b=Buffer.from(e.payload,"base64");if(!c.verify("sha256",b,f.readFileSync("public.pem"),Buffer.from(e.signature,"base64"))||JSON.parse(b).format!=="ragnarok-channel-probe-v1")process.exit(1);console.log("PASS firma de prueba");'
+      - name: Publicar prueba separada de las versiones instalables
+        run: |
+          set -euo pipefail
+          TAG="qa-canal-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          gh release create "$TAG" ragnarok-channel-probe.json --repo "$REPO" --target "$GITHUB_SHA" --prerelease --latest=false --title "QA canal: prueba no instalable" --notes "Prueba inocua de transporte HTTPS y firma. Sin reglas, catálogos, listas ni credenciales. No pertenece al canal estable."
+          for i in 1 2 3 4 5; do
+            if curl --fail --silent --show-error --location --proto '=https' --max-time 30 "https://github.com/$REPO/releases/download/$TAG/ragnarok-channel-probe.json" -o recibida.json; then break; fi
+            sleep 3
+          done
+          cmp ragnarok-channel-probe.json recibida.json
+          echo "PASS descarga pública anónima y bytes idénticos" >> "$GITHUB_STEP_SUMMARY"
